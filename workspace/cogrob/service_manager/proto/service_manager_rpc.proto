@@ -1,0 +1,154 @@
+// Copyright (c) 2019, The Regents of the University of California
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+// * Redistributions of source code must retain the above copyright
+//   notice, this list of conditions and the following disclaimer.
+// * Redistributions in binary form must reproduce the above copyright
+//   notice, this list of conditions and the following disclaimer in the
+//   documentation and/or other materials provided with the distribution.
+// * Neither the name of the University of California nor the
+//   names of its contributors may be used to endorse or promote products
+//   derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OF THE UNIVERSITY OF CALIFORNIA
+// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+import "cogrob/service_manager/proto/delayed_action.proto";
+import "cogrob/service_manager/proto/result_code.proto";
+import "cogrob/service_manager/proto/service_options.proto";
+import "cogrob/service_manager/proto/service_request.proto";
+import "cogrob/service_manager/proto/service_state.proto";
+
+package cogrob.service_manager;
+
+// Create a new service.
+message CreateServiceRequest {
+  ServiceOptions options = 1;
+}
+message CreateServiceResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+}
+
+// Query status of an existing service.
+message QueryServiceRequest {
+  ServiceId id = 1;
+}
+message QueryServiceResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+  ServiceState service_status = 3;
+}
+
+// Update an existing service.
+message UpdateServiceRequest {
+  ServiceOptions options = 1;
+}
+message UpdateServiceResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+}
+
+// Remove a service.
+message RemoveServiceRequest {
+  ServiceId id = 1;
+}
+message RemoveServiceResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+}
+
+
+// Request a service. ServiceManager will make the service (and its
+// dependencies) active before successfully returning this RPC.
+message RequestServiceRequest {
+  // TODO(shengye): Add a time period that this is suppose to renew/remove so we
+  // can detect resouce leak.
+  ServiceRequest request = 1;
+
+  // Whether to wait for all requested services to become ready before
+  // returning.
+  bool wait_for_ready = 2;
+}
+message RequestServiceResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+
+  // If wait_for_ready is not true, delayed_actions will report back which
+  // conditions must be met before the request is fully fulfilled.
+  repeated DelayedAction delayed_actions = 3;
+}
+
+// Release a service request.
+message ReleaseServiceRequest {
+  ServiceRequestId request_id = 1;
+}
+message ReleaseServiceResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+}
+
+message QueryServiceResourceUsageRequest {
+  ServiceId id = 1;
+}
+message QueryServiceResourceUsageResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+
+  oneof cpu_usage_oneof {
+    float cpu_usage = 3;  // Number of cores
+  }
+
+  oneof memory_usage_oneof {
+    float memory_usage = 4;  // Bytes
+  }
+}
+
+message QueryTotalResourceUsageRequest {
+  enum CollectMethod {
+    COLLECT_METHOD_UNKNOWN = 0;
+    COLLECT_METHOD_SUM_INDIVIDUAL = 1;
+    COLLECT_METHOD_PSUTIL = 2;
+  }
+  CollectMethod collect_method = 1;
+}
+message QueryTotalResourceUsageResponse {
+  ResultCode result = 1;
+  string error_message = 2;
+  float cpu_usage = 4;  // Number of cores
+  float memory_usage = 5;  // Bytes
+}
+
+message ListServicesRequest { }
+message ListServicesResponse {
+  repeated ServiceId services = 1;
+}
+
+service ServiceManager {
+  rpc CreateService (CreateServiceRequest) returns (CreateServiceResponse) {}
+  rpc QueryService (QueryServiceRequest) returns (QueryServiceResponse) {}
+  rpc UpdateService (UpdateServiceRequest) returns (UpdateServiceResponse) {}
+  rpc RemoveService (RemoveServiceRequest) returns (RemoveServiceResponse) {}
+  rpc ListServices (ListServicesRequest) returns (ListServicesResponse) {}
+
+  rpc RequestService (RequestServiceRequest) returns (RequestServiceResponse) {}
+  rpc ReleaseService (ReleaseServiceRequest) returns (ReleaseServiceResponse) {}
+
+  rpc QueryServiceResourceUsage (QueryServiceResourceUsageRequest)
+      returns (QueryServiceResourceUsageResponse) {}
+  rpc QueryTotalResourceUsage (QueryTotalResourceUsageRequest)
+      returns (QueryTotalResourceUsageResponse) {}
+}

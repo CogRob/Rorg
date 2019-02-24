@@ -1,0 +1,701 @@
+// Copyright (c) 2019, The Regents of the University of California
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are met:
+// * Redistributions of source code must retain the above copyright
+//   notice, this list of conditions and the following disclaimer.
+// * Redistributions in binary form must reproduce the above copyright
+//   notice, this list of conditions and the following disclaimer in the
+//   documentation and/or other materials provided with the distribution.
+// * Neither the name of the University of California nor the
+//   names of its contributors may be used to endorse or promote products
+//   derived from this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+// AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+// ARE DISCLAIMED. IN NO EVENT SHALL THE REGENTS OF THE UNIVERSITY OF CALIFORNIA
+// BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+// CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+// SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+// INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+// CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+// ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+// POSSIBILITY OF SUCH DAMAGE.
+
+syntax = "proto3";
+
+package cogrob.service_manager;
+
+// https://docker-py.readthedocs.io/en/stable/containers.html
+message DockerOptions {
+
+  // Message type for command and entrypoint.
+  message ExecCmd {
+    message CmdExecForm {
+      repeated string elements = 1;
+    }
+    oneof exec_cmd {
+      string shell_form = 1;
+      CmdExecForm exec_form = 2;
+    }
+  }
+
+  // Message type for blkio_weight_device.
+  message BlkioWeightDevice {
+    string path = 1;
+    int64 weight = 2;
+  }
+
+  // Linux kernel capabilities.
+  enum Capability {
+    CAP_UNKNOWN = 0;
+    CAP_CHOWN = 1;
+    CAP_DAC_OVERRIDE = 2;
+    CAP_DAC_READ_SEARCH = 3;
+    CAP_FOWNER = 4;
+    CAP_FSETID = 5;
+    CAP_KILL = 6;
+    CAP_SETGID = 7;
+    CAP_SETUID = 8;
+    CAP_SETPCAP = 9;
+    CAP_LINUX_IMMUTABLE = 10;
+    CAP_NET_BIND_SERVICE = 11;
+    CAP_NET_BROADCAST = 12;
+    CAP_NET_ADMIN = 13;
+    CAP_NET_RAW = 14;
+    CAP_IPC_LOCK = 15;
+    CAP_IPC_OWNER = 16;
+    CAP_SYS_MODULE = 17;
+    CAP_SYS_RAWIO = 18;
+    CAP_SYS_CHROOT = 19;
+    CAP_SYS_PTRACE = 20;
+    CAP_SYS_PACCT = 21;
+    CAP_SYS_ADMIN = 22;
+    CAP_SYS_BOOT = 23;
+    CAP_SYS_NICE = 24;
+    CAP_SYS_RESOURCE = 25;
+    CAP_SYS_TIME = 26;
+    CAP_SYS_TTY_CONFIG = 27;
+    CAP_MKNOD = 28;
+    CAP_LEASE = 29;
+    CAP_AUDIT_WRITE = 30;
+    CAP_AUDIT_CONTROL = 31;
+    CAP_SETFCAP = 32;
+    CAP_MAC_OVERRIDE = 33;
+    CAP_MAC_ADMIN = 34;
+    CAP_SYSLOG = 35;
+    CAP_WAKE_ALARM = 36;
+    CAP_BLOCK_SUSPEND = 37;
+    CAP_AUDIT_READ = 38;
+  }
+
+  // Message type for device_read/write_bps
+  message DeviceRateBps {
+    string path = 1;
+    int64 rate_bps = 2;
+  }
+
+  // Message type for device_read/write_iops
+  message DeviceRateIops {
+    string path = 1;
+    int64 rate_iops = 2;
+  }
+
+  // Message type for devices
+  message Device {
+    string path_on_host = 1;
+    string path_in_container = 2;
+    string cgroup_permissions = 3;
+  }
+
+  // One of name or id.
+  message NameOrId {
+    oneof name_or_id {
+      string name = 1;
+      int64 id = 2;
+    }
+  }
+
+  // Message type for healthcheck.
+  message Healthcheck {
+    string test = 1;
+    int64 interval = 2;
+    int64 timeout = 3;
+    int64 retries = 4;
+    int64 start_period = 5;
+  }
+
+  // Message type for ipc_mode;
+  message IpcMode {
+    enum IpcModeEnum {
+      IPC_MODE_DEFAULT = 0;
+      IPC_MODE_NONE = 1;
+      IPC_MODE_PRIVATE = 2;
+      IPC_MODE_SHAREABLE = 3;
+      IPC_MODE_HOST = 4;
+      IPC_MODE_CONTAINER = 5;
+    }
+    // ipc_mode (str) – Set the IPC mode for the container.
+    IpcModeEnum type = 1;
+    // Only valid with IPC_MODE_CONTAINER.
+    string join_container = 2;
+  }
+
+  // Enum for isolation.
+  enum Isolation {
+    ISOLATION_DEFAULT = 0;
+    ISOLATION_PROCESS = 1;
+    ISOLATION_HYPERV = 2;
+  }
+
+  // Message type for log_config.
+  message LogConfig {
+    string type = 1;
+    map<string, string> config = 2;
+  }
+
+  // Message type for mount
+  message Mount {
+    // Container path.
+    string target = 1;
+
+    // Mount source (e.g. a volume name or a host path).
+    string source = 2;
+
+    // The mount type (bind / volume / tmpfs / npipe). Default: volume.
+    enum MountType {
+      MOUNT_TYPE_DEFAULT = 0;
+      MOUNT_TYPE_BIND = 1;
+      MOUNT_TYPE_VOLUME = 2;
+      MOUNT_TYPE_TMPFS = 3;
+      MOUNT_TYPE_NPIPE = 4;
+    }
+    MountType type = 3;
+
+    // Whether the mount should be read-only.
+    oneof read_only_oneof {
+      bool read_only = 4;
+    }
+
+    // The consistency requirement for the mount. One of consistent, cached,
+    // delegated. (default`,)
+    enum Consistency {
+      MOUNT_CONSISTENCY_DEFAULT = 0;
+      MOUNT_CONSISTENCY_CONSISTENT = 1;
+      MOUNT_CONSISTENCY_CACHED = 2;
+      MOUNT_CONSISTENCY_DELEGATED = 3;
+    }
+    Consistency consistency = 5;
+
+    // A propagation mode with the value [r]private, [r]shared, or
+    // [r]slave. Only valid for the bind type.
+    enum Propagation {
+      MOUNT_PROPAGATION_DEFAULT = 0;
+      MOUNT_PROPAGATION_PRIVATE = 1;
+      MOUNT_PROPAGATION_SHARED = 2;
+      MOUNT_PROPAGATION_SLAVE = 3;
+      MOUNT_PROPAGATION_RPRIVATE = 4;
+      MOUNT_PROPAGATION_RSHARED = 5;
+      MOUNT_PROPAGATION_RSLAVE = 6;
+    }
+    Propagation propagation = 6;
+
+    // False if the volume should be populated with the data from the
+    // target. Default: False. Only valid for the volume type.
+    oneof no_copy_oneof {
+      bool no_copy = 7;
+    }
+
+    // User-defined name and labels for the volume. Only valid for the volume
+    // type.
+    map<string, string> labels = 8;
+
+    // (DriverConfig) – Volume driver configuration. Only valid for the volume
+    // type
+    message DriverConfig {
+      string name = 1;
+      map<string, string> options = 2;
+    }
+    DriverConfig driver_config = 9;
+
+    // The size for the tmpfs mount in bytes.
+    oneof tmpfs_size_oneof {
+      int64 tmpfs_size = 10;
+    }
+
+    // The permission mode for the tmpfs mount.
+    oneof tmpfs_mode_oneof {
+      int64 tmpfs_mode = 11;
+    }
+  }
+
+  // Message type for network_mode;
+  message NetworkMode {
+    enum NetworkModeEnum {
+      NETWORK_MODE_UNKNOWN = 0;
+      NETWORK_MODE_BRIDGE = 1;
+      NETWORK_MODE_NONE = 2;
+      NETWORK_MODE_HOST = 3;
+      NETWORK_MODE_CONTAINER = 4;
+    }
+    NetworkModeEnum type = 1;
+    // Only valid with NETWORK_MODE_CONTAINER.
+    string join_container = 2;
+  }
+
+  // Message type for pid_mode.
+  message PidMode {
+    enum PidModeEnum {
+      PID_MODE_UNKNOWN = 0;
+      PID_MODE_HOST = 1;
+      PID_MODE_CONTAINER = 2;
+    }
+    PidModeEnum type = 1;
+    // Only valid with PID_MODE_CONTAINER.
+    string join_container = 2;
+  }
+
+  // Message type for ports.
+  // Next TAG: 6
+  message Port {
+    int64 container_port = 1;
+    enum PortProtocol {
+      PORT_PROTOCOL_DEFAULT = 0;
+      PORT_PROTOCOL_TCP = 1;
+      PORT_PROTOCOL_UDP = 2;
+    }
+    PortProtocol protocol = 2;
+    message InterfaceAndPort {
+      string interface_address = 1;
+      int64 port = 2;
+    }
+    message MultiplePorts {
+      repeated int64 ports = 1;
+    }
+    oneof host_port {
+      int64 single_host_port = 3;
+      bool any_host_port = 4;
+      InterfaceAndPort host_interface_and_port = 5;
+      MultiplePorts multiple_host_ports = 6;
+    }
+  }
+
+  message RestartPolicy {
+    enum RestartPolicyType {
+      RESTART_POLICY_UNKNOWN = 0;
+      RESTART_POLICY_ALWAYS = 1;
+      RESTART_POLICY_ON_FAILURE = 2;
+    }
+    RestartPolicyType type = 1;
+    int64 maximum_retry_count = 2;
+  }
+
+  enum StopSignal {
+    STOP_SIG_DEFAULT = 0;
+    STOP_SIGABRT = 1;
+    STOP_SIGALRM = 2;
+    STOP_SIGFPE = 3;
+    STOP_SIGHUP = 4;
+    STOP_SIGILL = 5;
+    STOP_SIGINT = 6;
+    STOP_SIGKILL = 7;
+    STOP_SIGPIPE = 8;
+    STOP_SIGQUIT = 9;
+    STOP_SIGSEGV = 10;
+    STOP_SIGTERM = 11;
+    STOP_SIGUSR1 = 12;
+    STOP_SIGUSR2 = 13;
+    STOP_SIGCHLD = 14;
+    STOP_SIGCONT = 15;
+    STOP_SIGSTOP = 16;
+    STOP_SIGTSTP = 17;
+    STOP_SIGTTIN = 18;
+    STOP_SIGTTOU = 19;
+    STOP_SIGBUS = 20;
+    STOP_SIGPOLL = 21;
+    STOP_SIGPROF = 22;
+    STOP_SIGSYS = 23;
+    STOP_SIGTRAP = 24;
+    STOP_SIGURG = 25;
+    STOP_SIGVTALRM = 26;
+    STOP_SIGXCPU = 27;
+    STOP_SIGXFSZ = 28;
+  }
+
+  message UserNsMode {
+    enum UserNsModeEnum {
+      USER_NS_MODE_DEFAULT = 0;
+      USER_NS_MODE_HOST = 1;
+    }
+    UserNsModeEnum type = 1;
+  }
+
+  message Ulimit {
+    string name = 1;
+    oneof soft_oneof {
+      sint64 soft = 2;
+    }
+    oneof hard_oneof {
+      sint64 hard = 3;
+    }
+  }
+
+  // Next TAG: 5
+  message Volume {
+    string container_path = 1;
+    oneof volume_id {
+      string host_path = 2;
+      string volume_name = 3;
+    }
+    enum VolumeModeEnum {
+      VOLUME_MODE_DEFAULT = 0;
+      VOLUME_MODE_READ_ONLY = 1;
+      VOLUME_MODE_READ_WRITE = 2;
+    }
+    VolumeModeEnum mode = 4;
+  }
+
+  // The image to run, required field.
+  oneof image_oneof {
+    string image = 1;
+  }
+
+  // The command to run in the container, either in shell form or exec form.
+  ExecCmd command = 2;
+
+  // Enable auto-removal of the container on daemon side when the container's
+  // process exits.
+  oneof auto_remove_oneof {
+    bool auto_remove = 3;
+  }
+
+  // Block IO weight (relative device weight) in the form of:
+  // [{"Path": "device_path", "Weight": weight}].
+  repeated BlkioWeightDevice blkio_weight_device = 4;
+
+  // Block IO weight (relative weight), accepts a weight value between 10 and
+  // 1000.
+  oneof blkio_weight_oneof {
+    int64 blkio_weight = 5;
+  }
+
+  // Add kernel capabilities. For example, ["SYS_ADMIN", "MKNOD"].
+  repeated Capability cap_add = 6;
+
+  // Drop kernel capabilities.
+  repeated Capability cap_drop = 7;
+
+  // Number of usable CPUs (Windows only).
+  // DO NOT USE: cpu_count is not currently supported.
+  oneof cpu_count_oneof {
+    int64 cpu_count = 8;
+  }
+
+  // Usable percentage of the available CPUs (Windows only).
+  // DO NOT USE: cpu_percent is not currently supported.
+  oneof cpu_percent_oneof {
+    int64 cpu_percent = 9;
+  }
+
+  // The length of a CPU period in microseconds.
+  oneof cpu_period_oneof {
+    int64 cpu_period = 10;
+  }
+
+  // Microseconds of CPU time that the container can get in a CPU period.
+  oneof cpu_quota_oneof {
+    int64 cpu_quota = 11;
+  }
+
+  // CPU shares (relative weight).
+  oneof cpu_shares_oneof {
+    int64 cpu_shares = 12;
+  }
+
+  // CPUs in which to allow execution (0,1,3).
+  repeated int64 cpuset_cpus = 13;
+
+  // Memory nodes (MEMs) in which to allow execution (0,1,3).
+  // Only effective on NUMA systems.
+  // DO NOT USE: cpuset_mems is not currently supported.
+  repeated int64 cpuset_mems = 14;
+
+  // Run container in the background and return a Container object.
+  oneof detach_oneof {
+    bool detach = 15;
+  }
+
+  // A list of cgroup rules to apply to the container.
+  repeated string device_cgroup_rules = 16;
+
+  // Limit read rate (bytes per second) from a device in the form of:
+  // [{“Path”: “device_path”, “Rate”: rate}]
+  repeated DeviceRateBps device_read_bps = 17;
+
+  // Limit read rate (IO per second) from a device.
+  repeated DeviceRateIops device_read_iops = 18;
+
+  // Limit write rate (bytes per second) from a device.
+  repeated DeviceRateBps device_write_bps = 19;
+
+  // Limit write rate (IO per second) from a device.
+  repeated DeviceRateIops device_write_iops = 20;
+
+  // Expose host devices to the container, as a list of strings in the form
+  // <path_on_host>:<path_in_container>:<cgroup_permissions>.
+  repeated Device devices = 21;
+
+  // Set custom DNS servers.
+  repeated string dns = 22;
+
+  // Additional options to be added to the container's resolv.conf file.
+  repeated string dns_opt = 23;
+
+  // DNS search domains.
+  repeated string dns_search = 24;
+
+  // Set custom DNS search domains.
+  repeated string domainname = 25;
+
+  // The entrypoint for the container.
+  ExecCmd entrypoint = 26;
+
+  // Environment variables to set inside the container, as a dictionary
+  map<string, string> environment = 27;
+
+  // Addtional hostnames to resolve inside the container, as a mapping of
+  // hostname to IP address.
+  map<string, string> extra_hosts = 28;
+
+  // List of additional group names and/or IDs that the container process will
+  // run as.
+  repeated NameOrId group_add = 29;
+
+  // Specify a test to perform to check that the container is healthy.
+  Healthcheck healthcheck = 30;
+
+  // Optional hostname for the container.
+  oneof hostname_oneof {
+    string hostname = 31;
+  }
+
+  // Run an init inside the container that forwards signals and reaps processes
+  oneof init_oneof {
+    bool init = 32;
+  }
+
+  // Path to the docker-init binary
+  oneof init_path_oneof {
+    string init_path = 33;
+  }
+
+  // Set the IPC mode for the container.
+  IpcMode ipc_mode = 34;
+
+  // Isolation technology to use. Default: None.
+  Isolation isolation = 35;
+
+  // A dictionary of name-value labels
+  // (e.g. {"label1": "value1", "label2": "value2"}) or a list of names of
+  // labels to set with empty values (e.g. ["label1", "label2"])
+  map<string, string> labels = 36;
+
+  // Either a dictionary mapping name to alias or as a list of (name, alias)
+  // tuples.
+  map<string, string> links = 37;
+
+  // Logging configuration.
+  LogConfig log_config = 38;
+
+  // MAC address to assign to the container.
+  oneof mac_address_oneof {
+    string mac_address = 39;
+  }
+
+  // Memory limit. Accepts values which represent the memory limit of the
+  // created container in bytes.
+  oneof mem_limit_oneof {
+    int64 mem_limit = 40;
+  }
+
+  // Tune a container's memory swappiness behavior. Accepts number between 0 and
+  // 100.
+  oneof mem_swappiness_oneof {
+    int64 mem_swappiness = 41;
+  }
+
+  // Maximum amount of memory + swap a container is allowed to consume, in
+  // bytes.
+  oneof memswap_limit_oneof {
+    int64 memswap_limit = 42;
+  }
+
+  // Specification for mounts to be added to the container. More powerful
+  // alternative to volumes.
+  repeated Mount mounts = 43;
+
+  // The name for this container.
+  oneof name_oneof {
+    string name = 44;
+  }
+
+  // CPU quota in units of 1e-9 CPUs.
+  oneof nano_cpus_oneof {
+    int64 nano_cpus = 45;
+  }
+
+  // Name of the network this container will be connected to at
+  // creation time. You can connect to additional networks using
+  // Network.connect(). Incompatible with network_mode.
+  oneof network_oneof {
+    string network = 46;
+  }
+
+  // Disable networking.
+  oneof network_disabled_oneof {
+    bool network_disabled = 47;
+  }
+
+  // Network mode, one of:
+  // bridge - Create a new network stack for the container on on the
+  // bridge network;
+  // none - No networking for this container;
+  // container:<name|id> - Reuse another container’s network stack;
+  // host - Use the host network stack.
+  // Incompatible with network.
+  NetworkMode network_mode = 48;
+
+  // Whether to disable OOM killer.
+  oneof oom_kill_disable_oneof {
+    bool oom_kill_disable = 49;
+  }
+
+  // An integer value containing the score given to the container in order to
+  // tune OOM killer preferences.
+  oneof oom_score_adj_oneof {
+    int64 oom_score_adj = 50;
+  }
+
+  // If set to host, use the host PID namespace inside the container, or
+  // "container:<name|id>"
+  PidMode pid_mode = 51;
+
+  // Tune a container's pids limit. Set -1 for unlimited.
+  oneof pids_limit_oneof {
+    sint64 pids_limit = 52;
+  }
+
+  // Platform in the format os[/arch[/variant]]. Only used if the
+  // method needs to pull the requested image.
+  oneof platform_oneof {
+    string platform = 53;
+  }
+
+  // Ports to bind inside the container.
+  repeated Port ports = 54;
+
+  // Give extended privileges to this container.
+  oneof privileged_oneof {
+    bool privileged = 55;
+  }
+
+  // Publish all ports to the host.
+  oneof publish_all_ports_oneof {
+    bool publish_all_ports = 56;
+  }
+
+  // Mount the container’s root filesystem as read only.
+  oneof read_only_oneof {
+    bool read_only = 57;
+  }
+
+  // Remove the container when it has finished running. Default: False.
+  oneof remove_oneof {
+    bool remove = 58;
+  }
+
+  // Restart the container when it exits.
+  RestartPolicy restart_policy = 59;
+
+  // A list of string values to customize labels for MLS systems, such as
+  // SELinux.
+  repeated string security_opt = 60;
+
+  // shm_size (str or int) – Size of /dev/shm (e.g. 1G).
+  oneof shm_size_oneof {
+    int64 shm_size = 61;
+  }
+
+  // stdin_open (bool) – Keep STDIN open even if not attached.
+  oneof stdin_open_oneof {
+    bool stdin_open = 62;
+  }
+
+  // stdout (bool) – Return logs from STDOUT when detach=False. Default: True.
+  oneof stdout_oneof {
+    bool stdout = 63;
+  }
+
+  // stderr (bool) – Return logs from STDERR when detach=False. Default: False.
+  oneof stderr_oneof {
+    bool stderr = 64;
+  }
+
+  // The stop signal to use to stop the container (e.g. SIGINT).
+  StopSignal stop_signal = 65;
+
+  // Storage driver options per container as a key-value mapping.
+  map<string, string> storage_opt = 66;
+
+  // If true and detach is false, return a log generator instead of a string.
+  // Ignored if detach is true. Default: False.
+  oneof stream_oneof {
+    bool stream = 67;
+  }
+
+  // Kernel parameters to set in the container.
+  map<string, string> sysctls = 68;
+
+  // Temporary filesystems to mount, as a dictionary mapping a path inside the
+  // container to options for that path. For example:
+  // { '/mnt/vol2': '', '/mnt/vol1': 'size=3G,uid=1000' }
+  map<string, string> tmpfs = 69;
+
+  // tty (bool) – Allocate a pseudo-TTY.
+  oneof tty_oneof {
+    bool tty = 70;
+  }
+
+  // Ulimits to set inside the container, as a list of dicts.
+  repeated Ulimit ulimits = 71;
+
+  // Username or UID to run commands as inside the container.
+  NameOrId user = 72;
+
+  // Sets the user namespace mode for the container when user
+  // namespace remapping option is enabled. Supported values are: host
+  UserNsMode userns_mode = 73;
+
+  // The name of a volume driver/plugin.
+  oneof volume_driver_oneof {
+    string volume_driver = 74;
+  }
+
+  // To configure volumes mounted inside the container.
+  repeated Volume volumes = 75;
+
+  // List of container names or IDs to get volumes from.
+  repeated string volumes_from = 76;
+
+  // Path to the working directory.
+  oneof working_dir_oneof {
+    string working_dir = 77;
+  }
+
+  // Runtime to use with this container.
+  oneof runtime_oneof {
+    string runtime = 78;
+  }
+}
